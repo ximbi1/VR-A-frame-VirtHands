@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Manos en A-Frame</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://aframe.io/releases/1.2.0/aframe.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-extras/v6.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.rawgit.com/dmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-extras/v3.2.0/dist/aframe-ph-extras.min.js"></script>
+  </head>
+  <body>
+    <a-scene embedded physics="debug: false">
+      <a-entity id="rig" position="0 1.6 0">
+        <a-entity id="head" camera look-controls></a-entity>
+        <a-entity id="left-hand" hand-controls="hand: left" material= "src: url(objeto.png)" attract></a-entity>
+        <a-entity id="right-hand" hand-controls="hand: right" material= "src: url(objeto.png)"  attract></a-entity>
+      </a-entity>
+      <a-entity id="ground" geometry="primitive: plane; width: 100; height: 100" material="color: #333" position="0 0 0" rotation="-90 0 0" static-body></a-entity>
+      <a-sky color="#ECEC"></a-sky>
+      <a-entity id="sphere" geometry="primitive: sphere; radius: 0.5" material="color: #FFC107" position="0 1 -2" dynamic-body attract></a-entity>
+    </a-scene>
+
+    <script>
+      AFRAME.registerComponent('hand-controls', {
+        init: function () {
+          var el = this.el;
+          el.addEventListener('model-loaded', function () {
+            var leftHandModel = el.querySelector('#left-hand');
+            leftHandModel.setAttribute('visible', true);
+            leftHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+            var rightHandModel = el.querySelector('#right-hand');
+            rightHandModel.setAttribute('visible', true);
+            rightHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+          });
+        }
+      });
+
+      AFRAME.registerComponent('attract', {
+        schema: {
+          distance: {type: 'number', default: 2},
+          force: {type: 'number', default: 5}
+        },
+        tick: function () {
+          var handPosition = this.el.object3D.position;
+          var sphere = document.querySelector('#sphere');
+          var spherePosition = sphere.object3D.position;
+          var distance = handPosition.distanceTo(spherePosition);
+
+          if (distance < this.data.distance) {
+            var force = new THREE.Vector3().subVectors(handPosition, spherePosition).normalize().multiplyScalar(this.data.force);
+            sphere.body.applyForce(force, spherePosition);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

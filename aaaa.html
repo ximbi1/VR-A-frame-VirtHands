@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf8">
+    <title>Manos en A-Frame</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://aframe.io/releases/1.2.0/aframe.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-extras/v6.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-extras/v3.2.0/dist/aframe-physics-extras.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js2.2.0frame/build/aframe-ar.js"></script>
+  </head>
+  <body>
+    <a-scene embedded arjs>
+      <a-assets>
+        <img id="sky" src="https://cdn.aframe.io-painter/images/sky.jpg">
+        <img id="tree" src="https://cdn.aframe.io/a-painter/images/tree.png">
+        <img id="rock" src="https://cdn.aframe.io/a-painter/images/rock.jpg">
+      </a-assets>
+      <a-entity environment="preset: forest; skyType: custom; skyColor: #000000; skyImage: #sky;"></a-entity>
+      <a-entity id="player" camera look-controls position="0 1.6 0"></a-entity>
+      <a-entity id="score" text="value: Score: 0; align: center; width: 6;"></a-entity>
+      
+      <a-entity id="left-hand" hand-controls="hand: left" laser-controls="hand: left; model: false; maxDistance: 30;"></a-entity>
+      <a-entity id="right-hand" hand-controls="hand: right" laser-controls="hand: right; model: false; maxDistance: 30;"></a-entity>
+      
+      <a-entity id="object-spawner" object-spawner></a-entity>
+    </a-scene>
+    <script>
+      AFRAME.registerComponent('object-spawner', {
+        init: function () {
+          this.spawnObject();
+        },
+        spawnObject: function () {
+          var object = document.createElement('a-image');
+          var objectTypes = ['tree', 'rock'];
+          var objectType = objectTypes[Math.floor(Math.random() * objectTypes.length)];
+          object.setAttribute('src', '#' + objectType);
+          object.setAttribute('position', {
+            x: (Math.random() - 0.5) * 10,
+            y: 0,
+            z: (Math.random() - 0.5) * 10
+          });
+          object.setAttribute('rotation', {
+            x: 0,
+            y: Math.random() * 360,
+            z: 0
+          });
+          object.setAttribute('scale', {
+            x: 1,
+            y: 1,
+            z: 1
+          });
+          object.setAttribute('static-body', '');
+          object.setAttribute('dynamic-body', '');
+          object.setAttribute('grabbable', '');
+          object.setAttribute('animation__move', 'property: position; to: 0 -1 0; dur: 5000; easing: linear; loop: false;');
+          object.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 5000; easing: linear; loop: true;');
+          this.el.appendChild(object);
+          setTimeout(this.spawnObject.bind(this), 5000);
+        }
+      });
+      AFRAME.registerComponent('hand-controls', {
+        init: function () {
+          var el = this.el;
+          el.addEventListener('model-loaded', function () {
+            var leftHandModel = el.querySelector('#left-hand');
+            leftHandModel.setAttribute('visible', true);
+            leftHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+            var rightHandModel = el.querySelector('#right-hand');
+            rightHandModel.setAttribute('visible', true);
+            rightHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+          });
+        }
+      });
+      AFRAME.registerComponent('laser-controls', {
+        init: function () {
+          var el = this.el;
+          var hand = this.data.hand;
+          var maxDistance = this.data.maxDistance;
+          var intersectedEl = null;
+          var intersectedElColor = null;
+          var intersectedElPosition = null;
+          var intersectedElRotation = null;
+          var intersectedElScale = null;
+          var intersectedElParent = null;
+          var intersectedElParentPosition = null;
+          var intersectedElParentRotation = null;
+          var intersectedElParentScale = null;
+          var raycaster = el.components.raycaster;
+          el.addEventListener('triggerdown', function () {
+            if (intersectedEl) {
+              intersectedElColor = intersectedEl.getAttribute('material').color;
+              intersectedElPosition = intersectedEl.getAttribute('position');
+              intersectedElRotation = intersectedEl.getAttribute('rotation');
+              intersectedElScale = intersectedEl.getAttribute('scale');
+              intersectedElParent = intersectedEl.parentNode;
+              intersectedElParentPosition = intersectedElParent.getAttribute('position');
+              intersectedElParentRotation = intersectedElParent.getAttribute('rotation');
+              intersectedElParentScale = intersectedElParent.getAttribute('scale');
+              intersectedEl.setAttribute('material', 'color', 'white');
+              intersectedEl.setAttribute('position', '0 0 -10');
+              intersectedEl.setAttribute('rotation', '0 0 0');
+              intersectedEl.setAttribute('scale', '1 1 1');
+              intersectedElParent.setAttribute('position', intersectedElPosition);
+              intersectedElParent.setAttribute('rotation', intersectedElRotation);
+              intersectedElParent.setAttribute('scale', intersectedElScale);
+              intersectedEl = null;
+            }
+          });
+          el.addEventListener('triggerup', function () {
+            if (intersectedElColor) {
+              intersectedEl.setAttribute('material', 'color', intersectedElColor);
+              intersectedEl.setAttribute('position', intersectedElPosition);
+              intersectedEl.setAttribute('rotation', intersectedElRotation);
+              intersectedEl.setAttribute('scale', intersectedElScale);
+              intersectedElParent.setAttribute('position', intersectedElParentPosition);
+              intersectedElParent.setAttribute('rotation', intersectedElParentRotation);
+              intersectedElParent.setAttribute('scale', intersectedElParentScale);
+              intersectedElColor = null;
+            }
+          });
+          el.addEventListener('raycaster-intersection', function (evt) {
+            if (evt.detail.els.length > 0) {
+              intersectedEl = evt.detail.els[0];
+            }
+          });
+          el.addEventListener('raycaster-intersection-cleared', function () {
+            intersectedEl = null;
+          });
+        }
+      });
+      AFRAME.registerComponent('raycaster-controls', {
+        init: function () {
+          var el = this.el;
+          var hand = this.data.hand;
+          var intersectedEl = null;
+          var intersectedElColor = null;
+          var intersectedElPosition = null;
+          var intersectedElRotation = null;
+          var intersectedElScale = null;
+          var intersectedElParent = null;
+          var intersectedElParentPosition = null;
+          var intersectedElParentRotation = null;
+          var intersectedElParentScale = null;
+          var raycaster = el.components.raycaster;
+          el.addEventListener('triggerdown', function () {
+            if (intersectedEl) {
+              intersectedElColor = intersectedEl.getAttribute('material').color;
+              intersectedElPosition = intersectedEl.getAttribute('position');
+              intersectedElRotation = intersectedEl.getAttribute('rotation');
+              intersectedElScale = intersectedEl.getAttribute('scale');
+              intersectedElParent = intersectedEl.parentNode;
+              intersectedElParentPosition = intersectedElParent.getAttribute('position');
+              intersectedElParentRotation = intersectedElParent.getAttribute('rotation');
+              intersectedElParentScale = intersectedElParent.getAttribute('scale');
+              intersectedEl.setAttribute('material', 'color', 'white');
+              intersectedEl.setAttribute('position', '0 0 -10');
+              intersectedEl.setAttribute('rotation', '0 0 0');
+              intersectedEl.setAttribute('scale', '1 1 1');
+              intersectedElParent.setAttribute('position', intersectedElPosition);
+              intersectedElParent.setAttribute('rotation', intersectedElRotation);
+              intersectedElParent.setAttribute('scale', intersectedElScale);
+              intersectedEl = null;
+            }
+          });
+          el.addEventListener('triggerup', function () {
+            if (intersectedElColor) {
+              intersectedEl.setAttribute('material', 'color', intersectedElColor);
+              intersectedEl.setAttribute('position', intersectedElPosition);
+              intersectedEl.setAttribute('rotation', intersectedElRotation);
+              intersectedEl.setAttribute('scale', intersectedElScale);
+              intersectedElParent.setAttribute('position', intersectedElParentPosition);
+              intersectedElParent.setAttribute('rotation', intersectedElParentRotation);
+              intersectedElParent.setAttribute('scale', intersectedElParentScale);
+              intersectedElColor = null;
+            }
+          });
+          el.addEventListener('raycaster-intersection', function (evt) {
+            if (evt.detail.els.length > 0) {
+              intersectedEl = evt.detail.els[0];
+            }
+          });
+          el.addEventListener('raycaster-intersection-cleared', function () {
+            intersectedEl = null;
+          });
+        }
+      });
+      document.querySelector('#left-hand').setAttribute('raycaster-controls', {hand: 'left'});
+      document.querySelector('#right-hand').setAttribute('raycaster-controls', {hand: 'right'});
+    </script>
+  </body>
+</html>
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Manos en A-Frame</title>
+    <name="viewport" content="width=device-width, initial-scale=1"></name>
+    <script src="https://aframe.io/releases/1.2.0/aframe.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-extras/v6.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.rawgit.com/dmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-extras/v3.2.0/dist/aframe-ph-extras.min.js"></script>
+  </head>
+  <body>
+    <a-scene embedded physics="debug: false">
+      <a-entity id="rig" position="0 1.6 0">
+        <a-entity id="head" camera look-controls></a-entity>
+        <a-entity id="left-hand" hand-controls="hand: left"></a-entity>
+        <a-entity id="right-hand" hand-controls="hand: right"></a-entity>
+      </a-entity>
+      <a-entity id="sphere-container"></a-entity>
+      <a-entity id="ground" geometry="primitive: plane; width: 100; height: 100" material="color: #333" position="0 0 0" rotation="-90 0 0" static-body></a-entity>
+      <a-sky color="#ECEC"></a-sky>
+    </a-scene>
+
+    <script>
+      AFRAME.registerComponent('hand-controls', {
+        init: function () {
+          var el = this.el;
+          el.addEventListener('model-loaded', function () {
+            var leftHandModel = el.querySelector('#left-hand');
+            leftHandModel.setAttribute('visible', true);
+            leftHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+            var rightHandModel = el.querySelector('#right-hand');
+            rightHandModel.setAttribute('visible', true);
+            rightHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+          });
+        }
+      });
+    </script>
+    <script>
+      document.querySelector('a-scene').addEventListener('loaded', function () {
+        document.querySelector('#left-hand').setAttribute('attract', '');
+        document.querySelector('#right-hand').setAttribute('attract', '');
+      });
+    </script>
+  </body>
+</html>
+
+
+
+    <!--
+    <script>
+      AFRAME.registerComponent('attract', {
+        init: function () {
+          this.el.addEventListener('triggerdown', (event) => {
+            const raycaster = this.el.getAttribute('raycaster');
+            const direction = raycaster.direction;
+            const origin = raycaster.origin;
+            const end = {
+              x: origin.x + direction.x * raycaster.far,
+              y: origin.y + direction.y * raycaster.far,
+              z: origin.z + direction.z * raycaster.far
+            };
+            const sphere = document.createElement('a-entity');
+            sphere.setAttribute('geometry', 'primitive: sphere; radius: 0.1');
+            sphere.setAttribute('material', 'color', getRandomColor());
+            sphere.setAttribute('position', origin);
+            sphere.setAttribute('dynamic-body', '');
+            sphere.setAttribute('event-set__click', '_event: click; _target: #sphere-container; property: object3D.children.length; to: ${this.updateScore()};');
+            sphere.setAttribute('animation__move', `property: position; to: ${end.x} ${end.y} ${end.z}; dur: 500; easing: linear;`);
+            document.querySelector('#sphere-container').appendChild(sphere);
+          });
+        },
+        updateScore: function () {
+          var score = parseInt(document.querySelector('#score').getAttribute('text').value.split(' ')[1]);
+          score++;
+          document.querySelector('#score').setAttribute('text', 'value', `Score: ${score}`);
+        }
+      });
+
+      function getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+    </script>
+    -->
+
+
+
+
+
+    ----------------------
+    <!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Manos en A-Frame</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://aframe.io/releases/1.2.0/aframe.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-extras/v6.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.rawgit.com/dmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-extras/v3.2.0/dist/aframe-ph-extras.min.js"></script>
+  </head>
+  <body>
+    <a-scene embedded physics="debug false">
+      <a-entity id="rig" position="0 1.6 0">
+        <a-entity id="head" camera look-controls></a-entity>
+        <a-entity id="left-hand" hand-controls="hand: left" grabbable></a-entity>
+        <a-entity id="right-hand" hand-controls="hand: right" grabbable></a-entity>
+        <a-entity id="target" geometry="primitive: box; width: 0.5; height: 0.5; depth: 0.5" material="color: red" position="0 0.5 -1" static-body sound="src:sound"></a-entity>
+      </a-entity>
+      <a-entity id="ground" geometry="primitive: plane; width: 100; height: 100" material="color: #333" position="0 0 0" rotation="-90 0 0"-body></a-entity>
+      <a-sky color="#ECEC"></a-sky>
+      <audio id="target-sound" src="https://cdn.glitch.com/7d775d-7c5d-4ce-9d5d-7d7d7d7d7d7d%2Ftarget-sound.mp3?v=1623159479479"></audio>
+    </a-scene>
+
+    <script>
+      AFRAME.registerComponent('hand-controls', {
+        init: function () {
+          var el = this.el;
+          el.addEventListener('model-loaded', function () {
+            var leftHandModel = el.querySelector('#left-hand');
+            leftHandModel.setAttribute('visible', true);
+            leftHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+            var rightHandModel = el.querySelector('#right-hand');
+            rightHandModel.setAttribute('visible', true);
+            rightHandModel.setAttribute('animation-mixer', {
+              clip: '*',
+              loop: 'repeat'
+            });
+          });
+        }
+      });
+
+      AFRAME.registerComponent('grabbable', {
+        init: function () {
+          var el = this.el;
+          el.addEventListener('collide', function (event) {
+            if (event.detail.body.el.id === 'target') {
+              event.detail.target.el.setAttribute('material', 'color', 'green');
+              event.detail.target.el.setAttribute('sound', 'src', '#target-sound');
+              event.detail.target.el.components.sound.playSound();
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
